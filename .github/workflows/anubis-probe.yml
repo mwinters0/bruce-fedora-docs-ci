@@ -1,0 +1,44 @@
+# Throwaway (P9.1): does Anubis challenge a GitHub runner's address?
+name: anubis-probe
+on: workflow_dispatch
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner address
+        run: curl -s https://api.ipify.org; echo
+      - name: Probe
+        shell: bash
+        run: |
+          UA='bruce-fedora-docs/1.0 (+https://docs.fedoraproject.org/)'
+          probe() { # ua url
+            local out
+            out=$(curl -s -o /tmp/body -D /tmp/hdr -w '%{http_code} %{content_type} %{size_download}' -A "$1" --max-time 30 "$2")
+            local flag=clean
+            if grep -qiE 'anubis|techaro|making sure you.re not a bot|within.?your.?reach' /tmp/body; then flag=CHALLENGE; fi
+            echo "$flag $out $2"
+          }
+          echo "== guide UA, docs.fedoraproject.org, 3 a second"
+          for p in / en-US/ en-US/quick-docs/ en-US/quick-docs/dnf/ en-US/quick-docs/installing-plugins-for-playing-movies-and-music/ \
+                   en-US/fedora/latest/ en-US/fedora/rawhide/ en-US/fedora-server/ en-US/fedora-coreos/ en-US/epel/ \
+                   en-US/sitemap.xml en-US/quick-docs/_images/ fr/quick-docs/ de/quick-docs/ robots.txt \
+                   en-US/fedora-silverblue/ en-US/neurofedora/ en-US/package-maintainers/ en-US/ask-fedora/ en-US/infra/; do
+            probe "$UA" "https://docs.fedoraproject.org/$p"; sleep 0.33
+          done
+          echo "== guide UA, forge.fedoraproject.org, 1 a second"
+          for p in / docs/quick-docs docs/quick-docs/src/branch/main/README.md docs/docs-fp-o docs/release-notes \
+                   forge/documentation infra/docs api/v1/orgs/docs/repos robots.txt \
+                   fedora-infra/bodhi fedora-infra/ansible/issues; do
+            probe "$UA" "https://forge.fedoraproject.org/$p"; sleep 1
+          done
+          echo "== curl's default UA"
+          probe 'curl/8.0' https://docs.fedoraproject.org/en-US/quick-docs/
+          probe 'curl/8.0' https://forge.fedoraproject.org/docs/quick-docs
+          echo "== a browser UA"
+          probe 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' https://docs.fedoraproject.org/en-US/quick-docs/
+          probe 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' https://forge.fedoraproject.org/docs/quick-docs
+          echo "== other hosts the crawl asks"
+          for u in https://pagure.io/ https://fedoramagazine.org/ https://getfedora.org/ https://src.fedoraproject.org/ https://www.redhat.com/ https://bugzilla.redhat.com/; do
+            probe "$UA" "$u"; sleep 1
+          done

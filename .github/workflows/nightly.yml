@@ -1,0 +1,100 @@
+name: nightly
+
+# The dev deployment of the deployment guide's scheduled job
+# (docs/manual/deploy.md in mwinters0/bruce): crawl en-US, stage the published
+# directory, and publish it as the one commit of the gh-pages branch. It keeps no
+# history database; the pinned release is BRUCE_TAG.
+
+on:
+  # The schedule joins once a dispatched run has published:
+  # schedule:
+  #   - cron: "0 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora-minimal:44
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    env:
+      BRUCE_REPO: mwinters0/bruce
+      BRUCE_TAG: v0.3.0-rc.1
+    steps:
+      - name: Install the tools
+        run: |
+          microdnf -y install --setopt=install_weak_deps=False git tar gzip
+
+      - name: Check out main
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git init -q .
+          git fetch -q --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+
+      - name: Fetch the pinned release
+        run: |
+          base=$GITHUB_SERVER_URL/$BRUCE_REPO/releases/download/$BRUCE_TAG
+          archive=bruce-$BRUCE_TAG-x86_64-unknown-linux-gnu.tar.gz
+          mkdir -p "$RUNNER_TEMP/bruce/bin"
+          cd "$RUNNER_TEMP/bruce"
+          curl -fsSL --retry 3 -O "$base/$archive" -O "$base/$archive.sha256"
+          sha256sum -c "$archive.sha256"
+          ln -sf "$archive" release.tar.gz
+          tar -xzf "$archive" --strip-components=1 -C bin "bruce-$BRUCE_TAG-x86_64-unknown-linux-gnu/bruce"
+          bin/bruce --version
+
+      - name: Fetch what was last published
+        run: |
+          # The published directory as the last night left it, without .git: the job
+          # renames a new directory over it. Absent on the first night.
+          url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY
+          status=0
+          git ls-remote --exit-code --heads "$url" gh-pages > /dev/null || status=$?
+          if [ "$status" -eq 0 ]; then
+            git clone -q --depth 1 --branch gh-pages "$url" "$RUNNER_TEMP/last"
+            rm -rf "$RUNNER_TEMP/last/.git"
+            mv "$RUNNER_TEMP/last" pub
+          elif [ "$status" -eq 2 ]; then
+            echo "gh-pages does not exist yet: the first night."
+          else
+            exit "$status"
+          fi
+          sha256sum pub/SHA256SUMS > "$RUNNER_TEMP/before" 2> /dev/null || echo none > "$RUNNER_TEMP/before"
+
+      - name: Run the scheduled job
+        run: |
+          export PATH="$RUNNER_TEMP/bruce/bin:$PATH"
+          ARCHIVE="$RUNNER_TEMP/bruce/release.tar.gz" CONFIG=bruce.toml DB="$RUNNER_TEMP/bruce.duckdb" \
+            PUB=pub KEEP= ./bruce-nightly.sh && status=0 || status=$?
+          echo "bruce-nightly.sh: exit $status after $SECONDS seconds" | tee -a "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Publish the directory as one commit
+        # Also after a digest that failed: the baseline CI needs was published.
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/before" ] || exit 0
+          after=$(sha256sum pub/SHA256SUMS 2> /dev/null || echo none)
+          if [ "$after" = "$(cat "$RUNNER_TEMP/before")" ]; then
+            echo "The job staged nothing new; nothing is published."
+            exit 0
+          fi
+          cd pub
+          : > .nojekyll
+          git init -q -b gh-pages
+          git config user.name "bruce-fedora-docs-ci"
+          git config user.email "noreply@github.com"
+          git add -A
+          git commit -q -m "Publish $(date -u +%Y-%m-%d)"
+          git push -f "https://x-access-token:$GITHUB_TOKEN@${GITHUB_SERVER_URL#https://}/$GITHUB_REPOSITORY.git" gh-pages
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

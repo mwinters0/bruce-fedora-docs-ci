@@ -6,9 +6,8 @@ name: nightly
 # history database; the pinned release is BRUCE_TAG.
 
 on:
-  # The schedule joins once a dispatched run has published:
-  # schedule:
-  #   - cron: "0 1 * * *"
+  schedule:
+    - cron: "0 1 * * *"
   workflow_dispatch:
 
 permissions:
@@ -74,7 +73,7 @@ jobs:
         run: |
           export PATH="$RUNNER_TEMP/bruce/bin:$PATH"
           ARCHIVE="$RUNNER_TEMP/bruce/release.tar.gz" CONFIG=bruce.toml DB="$RUNNER_TEMP/bruce.duckdb" \
-            PUB=pub KEEP= ./bruce-nightly.sh && status=0 || status=$?
+            PUB=pub KEEP= KEEP_JSON=60 ./bruce-nightly.sh && status=0 || status=$?
           echo "bruce-nightly.sh: exit $status after $SECONDS seconds" | tee -a "$GITHUB_STEP_SUMMARY"
           exit "$status"
 

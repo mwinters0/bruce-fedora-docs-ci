@@ -12,7 +12,7 @@ PUB=${PUB%/}
 KEEP=${KEEP-30}
 NAME=${NAME:-bruce}
 KEEP_VIEWS=${KEEP_VIEWS:-30}
-KEEP_JSON=${KEEP_JSON:-400}
+KEEP_JSON=${KEEP_JSON:-90}
 DELIVER=${DELIVER:-}
 
 # The first failure's status is the job's, once it has done what it still can.

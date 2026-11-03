@@ -13,6 +13,7 @@ KEEP=${KEEP-30}
 NAME=${NAME:-bruce}
 KEEP_VIEWS=${KEEP_VIEWS:-30}
 KEEP_JSON=${KEEP_JSON:-90}
+VIEW=${VIEW:-default}
 DELIVER=${DELIVER:-}
 
 # The first failure's status is the job's, once it has done what it still can.
@@ -51,12 +52,12 @@ gzip -n -9 "$work/baseline.duckdb" || exit 1
 # still fails does not stop the job: CI needs the baseline.
 digest=3
 if [ -f "$PUB/baseline.duckdb.gz" ]; then
-  bruce report digest --db "$DB" --out "$work/digest" --name "$NAME" --since "$PUB/baseline.duckdb.gz"
+  bruce report digest --db "$DB" --out "$work/digest" --name "$NAME" --view "$VIEW" --since "$PUB/baseline.duckdb.gz"
   digest=$?
 fi
 if [ "$digest" -eq 3 ]; then
   rm -f "$work/digest"/*
-  bruce report digest --db "$DB" --out "$work/digest" --name "$NAME"
+  bruce report digest --db "$DB" --out "$work/digest" --name "$NAME" --view "$VIEW"
   digest=$?
 fi
 [ "$digest" -eq 0 ] || note "$digest"

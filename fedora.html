@@ -1,0 +1,26 @@
+{% set bruce_model = 2 %}
+{% extends "bruce:digest.html" %}
+{% block palette %}
+:root {
+  color-scheme: dark;
+  --bg: #12151c;
+  --surface: #1a1e28;
+  --raised: #222735;
+  --text: #e4e7ee;
+  --muted: #9aa3b5;
+  --line: #2d3445;
+  --accent: #51a2da;
+  --accent-deep: #294172;
+  --bad: #f0868b;
+  --warn: #e5be6b;
+  --good: #7fcf9a;
+  --new: #51a2da;
+}
+@media print {
+  :root {
+    color-scheme: light;
+    --bg: #fff; --surface: #fff; --raised: #f2f4f8; --text: #111; --muted: #555;
+    --line: #ccd; --accent: #1f5f93; --accent-deep: #fff; --bad: #a11; --warn: #7a5a00; --good: #1a6b36; --new: #1f5f93;
+  }
+}
+{% endblock %}

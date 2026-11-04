@@ -73,7 +73,7 @@ jobs:
         run: |
           export PATH="$RUNNER_TEMP/bruce/bin:$PATH"
           ARCHIVE="$RUNNER_TEMP/bruce/release.tar.gz" CONFIG=bruce.toml DB="$RUNNER_TEMP/bruce.duckdb" \
-            PUB=pub KEEP= KEEP_JSON=30 VIEW=fedora.html ./bruce-nightly.sh && status=0 || status=$?
+            PUB=pub KEEP= KEEP_JSON=30 VIEW=fedora.html INDEX=1 ./bruce-nightly.sh && status=0 || status=$?
           echo "bruce-nightly.sh: exit $status after $SECONDS seconds" | tee -a "$GITHUB_STEP_SUMMARY"
           exit "$status"
 

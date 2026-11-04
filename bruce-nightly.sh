@@ -14,7 +14,17 @@ NAME=${NAME:-bruce}
 KEEP_VIEWS=${KEEP_VIEWS:-30}
 KEEP_JSON=${KEEP_JSON:-90}
 VIEW=${VIEW:-default}
+INDEX=${INDEX:-}
 DELIVER=${DELIVER:-}
+
+# A view's file is published as the digest of its format, `digest.<ext>`, so its
+# name must say one; `.json` is the JSON digest's. Refused before the crawl.
+view_name=${VIEW##*/}
+view_ext=${view_name##*.}
+if [ "$VIEW" != default ] && { [ "$view_ext" = "$view_name" ] || [ "${view_ext,,}" = json ]; }; then
+  echo "bruce-nightly: VIEW $VIEW must be default or a file with an extension other than .json" >&2
+  exit 1
+fi
 
 # The first failure's status is the job's, once it has done what it still can.
 rc=0
@@ -62,6 +72,15 @@ if [ "$digest" -eq 3 ]; then
 fi
 [ "$digest" -eq 0 ] || note "$digest"
 
+# A view in a file is written as STEM-DATE-FILE; it is published as the digest of
+# its format, STEM-DATE.EXT.
+if [ "$digest" -eq 0 ] && [ "$VIEW" != default ]; then
+  for f in "$work/digest/$NAME"-????-??-??-"$view_name"; do
+    d=${f##*/}
+    mv "$f" "$work/digest/${d%"-$view_name"}.$view_ext" || note $?
+  done
+fi
+
 # Deletes the files given that are dated before the $1 newest nights among them.
 trim() {
   local keep=$1 cutoff f d
@@ -75,6 +94,42 @@ trim() {
 }
 
 short() { sha256sum "$1" | cut -c1-16; }
+
+# An HTML-safe copy of $1.
+esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
+
+# INDEX: index.html for people, in the staged directory $1: the latest files under
+# their fixed names, then each night's digests, newest first. Never the names by
+# content, which are CI's.
+index() {
+  local dir=$1 f n day
+  {
+    echo '<!doctype html>'
+    echo '<meta charset="utf-8">'
+    echo '<meta name="viewport" content="width=device-width, initial-scale=1">'
+    echo '<meta name="color-scheme" content="light dark">'
+    echo "<title>$(esc "$NAME")</title>"
+    echo "<h1>$(esc "$NAME")</h1>"
+    echo '<h2>The latest</h2>'
+    echo '<ul>'
+    for f in "$dir"/digest.* "$dir/bruce.tar.gz" "$dir/bruce.toml" "$dir/baseline.duckdb.gz" "$dir/SHA256SUMS"; do
+      n=$(esc "${f##*/}")
+      echo "<li><a href=\"$n\">$n</a></li>"
+    done
+    echo '</ul>'
+    echo '<h2>Each night</h2>'
+    echo '<ul>'
+    for day in $(for f in "$dir/digests/$NAME"-????-??-??.*; do n=${f##*/}; n=${n#"$NAME"-}; echo "${n:0:10}"; done | sort -ru); do
+      printf '<li>%s' "$day"
+      for f in "$dir/digests/$NAME-$day".*; do
+        n=$(esc "${f##*/}")
+        printf ' <a href="digests/%s">%s</a>' "$n" "$(esc "${f##*.}")"
+      done
+      echo '</li>'
+    done
+    echo '</ul>'
+  } > "$dir/index.html"
+}
 
 # S4: stage a new directory, then rename it over PUB. SHA256SUMS is written
 # last; the files it lists are named by their content.
@@ -114,7 +169,7 @@ stage() {
       cp "$f" "$new/digest$rest"
     done
   else
-    for f in "$PUB"/digest.* "$PUB"/digest-*; do cp -p "$f" "$new/"; done
+    for f in "$PUB"/digest.*; do cp -p "$f" "$new/"; done
   fi
   local json=("$new/digests/$NAME"-????-??-??.json) views=()
   for f in "$new/digests/$NAME"-????-??-??[.-]*; do
@@ -123,7 +178,13 @@ stage() {
   trim "$KEEP_JSON" "${json[@]}"
   trim "$KEEP_VIEWS" "${views[@]}"
 
-  (cd "$new" && sha256sum "$bin" "$cfg" "$base" digest.* digest-* digests/*) > "$work/SHA256SUMS"
+  local listed=()
+  if [ -n "$INDEX" ]; then
+    index "$new"
+    listed=(index.html)
+  fi
+
+  (cd "$new" && sha256sum "$bin" "$cfg" "$base" digest.* digests/* "${listed[@]}") > "$work/SHA256SUMS"
   cp "$work/SHA256SUMS" "$new/SHA256SUMS"
 
   rm -rf "$PUB.old"

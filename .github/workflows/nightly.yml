@@ -26,7 +26,7 @@ jobs:
         shell: bash
     env:
       BRUCE_REPO: mwinters0/bruce
-      BRUCE_TAG: v0.3.0-rc.1
+      BRUCE_TAG: v0.3.0-rc.2
     steps:
       - name: Install the tools
         run: |

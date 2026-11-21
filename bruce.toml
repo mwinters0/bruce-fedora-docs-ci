@@ -1,0 +1,35 @@
+user_agent = "bruce-fedora-docs/1.0 (+https://github.com/mwinters0/bruce-fedora-docs-ci)"
+
+allowlist = [
+  "fedoraproject.org", "*.fedoraproject.org",
+  "getfedora.org", "*.getfedora.org",
+  "fedorapeople.org", "*.fedorapeople.org",
+  "fedoramagazine.org", "*.fedoramagazine.org",
+  "fedorainfracloud.org", "*.fedorainfracloud.org",
+  "fedorahosted.org", "*.fedorahosted.org",
+  "pagure.io", "*.pagure.io",
+  "centos.org", "*.centos.org",
+  "redhat.com", "*.redhat.com",
+]
+
+skip = [
+  "https://forge.fedoraproject.org/**/issues/new*",
+  "https://forge.fedoraproject.org/**/issues/new*/**",
+  "https://forge.fedoraproject.org/user/login*",
+]
+
+[host."docs.fedoraproject.org"]
+robots = false
+per_second = 3
+
+[host."forge.fedoraproject.org"]
+per_second = 1
+
+[[root]]
+url = "https://docs.fedoraproject.org/en-US/"
+sitemap = "https://docs.fedoraproject.org/en-US/sitemap.xml"
+
+[[profile]]
+name = "fedora"
+extends = "antora"
+locale_links = "a.language[href]"
